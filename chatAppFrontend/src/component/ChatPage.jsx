@@ -19,7 +19,7 @@ const ChatPage = () => {
 
   useEffect(() => {    // for if user is not connected then navigate to home page
     if (!connected) {  // if user is not connected then navigate to home page
-      navigate("/");   // navigate to home page
+      navigate("/joinchat");   // navigate to home page
     }
   }, [roomId, currUser, connected]);  // if roomId, currUser, connected is changed then useEffect will run
 
@@ -58,33 +58,44 @@ const ChatPage = () => {
   } , [message]) // useEffect will run when message state is updated
    
 
-
   useEffect(() => {
-    const connectWebSocket = () => {     // for connecting to websocket
-      const sock = new SockJS(`${baseURL}/chat`);   // creating new sockjs object and passing base url for websocket to connect 
+  const connectWebSocket = () => {
+    const sock = new SockJS(`${baseURL}/chat`);
 
-      const client = Stomp.over(sock);  // creating new stomp client object and passing sockjs object to it why becuase stomp client is built on top of sockjs 
+    const client = Stomp.over(sock);
 
-      client.connect({}, () => {   // connecting to websocket and passing empty object as header and callback function as second argument
-        setStompClient(client);     // setting stomp client in state
+    client.connect(
+      {
+        Authorization: `Bearer ${localStorage.getItem("jwt")}`, // ✅ JWT added
+      },
+      () => {
+        setStompClient(client);
+        setConnected(true); // ✅ mark as connected
 
-        toast.success("Connected..");  // showing success message using toast library
+        toast.success("Connected..");
 
-        client.subscribe(`/topic/room/${roomId}`, (message) => {  // subscribing to topic and passing room id and callback function as second argument
-          console.log(message);
-  
-          const newMessage = JSON.parse(message.body);  // parsing message body to json format
-          
-          setMessage((prev) => [...prev, newMessage]);  // updating message state with new message
-          
+        client.subscribe(`/topic/room/${roomId}`, (message) => {
+          const newMessage = JSON.parse(message.body);
+          setMessage((prev) => [...prev, newMessage]);
         });
-      });
-    };
+      },
+      (error) => {
+        console.error("WebSocket error:", error);
+      }
+    );
+  };
 
-    if(connected){     // if connected is true then disconnect from websocket and connect again to new room
-      connectWebSocket();
+  // ✅ connect when roomId changes
+  connectWebSocket();
+
+  // ✅ cleanup when room changes / component unmounts
+  return () => {
+    if (stompClient && stompClient.connected) {
+      stompClient.disconnect();
     }
-  }, [roomId]);  // useEffect will run when roomId state is updated
+  };
+}, [roomId]);
+
 
   const sendMessage = async () =>{   // function for sending message to websocket
     if(stompClient && connected && input.trim()){   // if stomp client is connected and input is not empty then send message
@@ -105,7 +116,7 @@ const ChatPage = () => {
     setConnected(false)        // updating connected state to false
     setRoomId("")  // clearing roomId state
     setCurrUser("") // clearing currUser state
-    navigate("/")  // navigating to home page
+    navigate("/joinchat")  // navigating to home page
   }
 
   return (
